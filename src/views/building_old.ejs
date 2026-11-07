@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><%= title %></title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+<link rel="stylesheet" href="/css/classroom-map.css">
+<link rel="stylesheet" href="/css/classroom-details.css">
+</head>
+
+<body>
+<%- include('partials/header') %>
+
+<div class="container-fluid p-3 p-lg-4">
+
+    <div class="row g-3">
+
+        <!-- MAP -->
+        <main class="col-12 col-xl-8">
+
+            <section class="panel">
+
+<div class="mb-3">
+    <h2 class="mb-1">Planimetria edificio</h2>
+</div>
+                <!-- LEGEND -->
+                <div class="d-flex flex-wrap gap-3 mb-3 small">
+
+                    <span>
+                        <i class="legend-dot"
+                           style="background:#2ea078"></i>
+                        Libera
+                    </span>
+
+                    <span>
+                        <i class="legend-dot"
+                           style="background:#d64c3a"></i>
+                        Occupata
+                    </span>
+
+                    <span>
+                        <i class="legend-dot"
+                           style="background:#828884"></i>
+                        Non è un'aula
+                    </span>
+
+                </div>
+
+                <h3 class="mb-3" id="floorName">
+                    Piano Terra - Lunedì - 08:00
+                </h3>    
+
+                <!-- MAP IMAGE + SVG -->
+                <div class="map-container" id="mapContainer">
+
+                    <img id="floorImage"
+                         src="<%= piani[0].immagine %>"
+                         alt="Planimetria del piano">
+
+                    <div id="mapOverlay"></div>
+
+                </div>
+
+            </section>
+
+        </main>
+<!-- RIGHT SIDEBAR -->
+<aside class="col-12 col-xl-4">
+
+
+<div class="card">
+    <div class="card-body">
+        <h5 class="card-title mb-3">Ricerca aule e lezioni</h5>
+
+        <div class="btn-group w-100 mb-3" role="group"
+             aria-label="Tipo di ricerca">
+            <input type="radio" class="btn-check"
+                   name="searchMode" id="modeClassroom"
+                   value="classroom" checked>
+            <label class="btn btn-outline-primary"
+                   for="modeClassroom">Aule</label>
+
+            <input type="radio" class="btn-check"
+                   name="searchMode" id="modeSubject"
+                   value="subject">
+            <label class="btn btn-outline-primary"
+                   for="modeSubject">Materie</label>
+
+            <input type="radio" class="btn-check"
+                   name="searchMode" id="modeTeacher"
+                   value="teacher">
+            <label class="btn btn-outline-primary"
+                   for="modeTeacher">Docenti</label>
+        </div>
+
+        <input type="search" id="searchInput"
+               class="form-control mb-3"
+               placeholder="Numero aula..."
+               autocomplete="off">
+
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                <label for="searchDay" class="form-label">Giorno</label>
+                <select id="searchDay" class="form-select">
+                    <option value="Monday">Lunedì</option>
+                    <option value="Tuesday">Martedì</option>
+                    <option value="Wednesday">Mercoledì</option>
+                    <option value="Thursday">Giovedì</option>
+                    <option value="Friday">Venerdì</option>
+                </select>
+            </div>
+
+            <div class="col-6">
+                <label for="searchTime" class="form-label">Ora</label>
+                <input type="time" id="searchTime"
+                       class="form-control" value="08:00">
+            </div>
+
+            <div class="col-12">
+                <label for="searchFloor" class="form-label">Piano</label>
+                <select id="searchFloor" class="form-select">
+                    <option value="all">Tutti i piani</option>
+                    <% piani.forEach(piano => { %>
+                        <option value="<%= piano.id %>">
+                            <%= piano.nome %>
+                        </option>
+                    <% }) %>
+                </select>
+            </div>
+            
+        </div>
+
+        <div class="form-check mb-3">
+            <input type="checkbox" class="form-check-input"
+                   id="searchExactTime" checked>
+            <label class="form-check-label"
+                   for="searchExactTime">
+                Solo lezioni attive all'ora selezionata
+            </label>
+        </div>
+
+        <p id="noResults" class="text-secondary small"
+           aria-live="polite"></p>
+        <ul id="searchResults" class="search-results"></ul>
+    </div>
+</div>
+
+
+    <!-- MAP FILTERS -->
+    <section class="panel mb-3">
+        <section class="panel mb-3">
+
+    <h5 class="mb-3">Filtri Mappa</h5>
+
+    <!-- FLOOR -->
+    <div class="mb-3">
+        <label for="floorSelect" class="form-label">
+            Piano
+        </label>
+
+        <select id="floorSelect" class="form-select">
+            <% piani.forEach(piano => { %>
+                <option value="<%= piano.id %>">
+                    <%= piano.nome %>
+                </option>
+            <% }) %>
+        </select>
+    </div>
+
+    <!-- DAY -->
+    <div class="mb-3">
+        <label for="daySelect" class="form-label">
+            Giorno
+        </label>
+
+        <select id="daySelect" class="form-select">
+            <option value="Monday">Lunedì</option>
+            <option value="Tuesday">Martedì</option>
+            <option value="Wednesday">Mercoledì</option>
+            <option value="Thursday">Giovedì</option>
+            <option value="Friday">Venerdì</option>
+        </select>
+    </div>
+
+    <!-- TIME -->
+    <div class="mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <label for="timeSlider" class="form-label mb-0">
+                Orario
+            </label>
+
+            <span class="time-display" id="timeDisplay">
+                08:00
+            </span>
+        </div>
+
+        <input
+            type="range"
+            class="form-range"
+            id="timeSlider"
+            min="450"
+            max="1080"
+            step="15"
+            value="480"
+        >
+
+        <!-- PLAYBACK CONTROLS -->
+        <div class="d-flex gap-2 mt-2">
+            <button
+                type="button"
+                class="btn btn-outline-secondary flex-fill"
+                id="nowButton"
+            >
+                Adesso
+            </button>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- AVAILABILITY -->
+    <div class="mb-3">
+        <label for="availabilityFilter" class="form-label">
+            Disponibilità
+        </label>
+
+        <select id="availabilityFilter" class="form-select">
+            <option value="all">Tutte le aule</option>
+            <option value="free">Solo aule libere</option>
+            <option value="occupied">Solo aule occupate</option>
+        </select>
+    </div>
+
+    <!-- RESET -->
+    <button
+        type="button"
+        class="btn btn-outline-secondary w-100"
+        id="resetFilters"
+    >
+        Reset filtri
+    </button>
+
+</section>
+    </section>
+
+    <!-- CSV UPLOAD -->
+    <section class="panel">
+                    <!-- CSV UPLOAD -->
+            <section class="panel">
+
+                <h5>Importa orario</h5>
+
+                <p class="text-secondary small">
+                    Carica un file CSV per aggiornare le lezioni
+                    e la disponibilità delle aule.
+                </p>
+
+                <form id="csvForm" enctype="multipart/form-data">
+
+                    <input type="file"
+                           class="form-control mb-3"
+                           id="csvFile"
+                           name="csv"
+                           accept=".csv,text/csv"
+                           required>
+
+                    <button type="submit"
+                            class="btn btn-primary w-100">
+                        <i class="bi bi-upload"></i>
+                        Carica CSV
+                    </button>
+
+                </form>
+
+                <div id="uploadMessage"
+                     class="small mt-2"
+                     aria-live="polite"></div>
+
+            </section>
+    </section>
+
+</aside>
+
+    </div>
+
+<div class="modal fade" id="classroomModal" tabindex="-1" aria-labelledby="classroomTitle" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="classroomTitle">Classroom</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="classroomDetails"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    window.APP_CONFIG = {
+        floors: <%- JSON.stringify(
+            piani.map(p => ({
+                id: p.id,
+                nome: p.nome,
+                immagine: p.immagine
+            }))
+        ).replace(/</g, '\\u003c') %>
+    };
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+<script type="module" src="/js/classroom-map/main.js"></script>
+
+</body>
+</html>
+```

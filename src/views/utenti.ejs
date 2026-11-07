@@ -1,0 +1,206 @@
+<!-- 1. jQuery -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+<!-- 2. Bootstrap JS (bundle include Popper) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- 3. DataTables JS -->
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+<head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    <title><%= title %></title>
+</head>
+<% /** * Vista: Gestione Utenti (solo Admin) * * Rotte backend attese (vedi passi CRUD discussi in precedenza): * GET
+    /admin/utenti/datatable -> dati per DataTables (server-side)
+    * POST /admin/utenti -> crea utente
+    * GET /admin/utenti/:id -> dettaglio utente (per precompilare il form di modifica)
+    * PUT /admin/utenti/:id -> aggiorna utente
+    * DELETE /admin/utenti/:id -> elimina utente
+    */
+    %>
+
+    <%- include('partials/header') %>
+
+    <div class="container mt-4">
+
+        <%- include('partials/datatable-partial', { tableId: 'tabellaUtenti' , title: 'Gestione Utenti' ,
+            ajaxUrl: '/admin/utenti/datatable' , columns: [ 
+            { data: 'email' , title: 'Email' },
+            { data: 'type' ,title: 'Tipo' },
+            { data: 'createdAt' , title: 'Creato il' } ]
+            , showAddButton: true,
+            addButtonLabel: 'Nuovo utente' , addButtonId: 'btnNuovoUtente' , rowActions: true,
+            deleteConfirmMessage: "Vuoi eliminare definitivamente questo utente?" }) %>
+
+    </div>
+
+    <!-- Modale unico per Creazione / Modifica -->
+    <div class="modal fade" id="modaleUtente" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="formUtente">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modaleUtenteTitolo">Nuovo utente</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+
+                    <div class="modal-body">
+
+                        <!-- id nascosto: vuoto in creazione, valorizzato in modifica -->
+                        <input type="hidden" id="utenteId" name="id" value="">
+
+                        <div id="formUtenteErrori" class="alert alert-danger d-none"></div>
+
+                        <div class="mb-3">
+                            <label for="utenteEmail" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="utenteEmail" name="email" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="utentePassword" class="form-label">
+                                Password
+                                <small class="text-muted" id="passwordHint" style="display:none;">
+                                    (lascia vuoto per non modificarla)
+                                </small>
+                            </label>
+                            <input type="password" class="form-control" id="utentePassword" name="password">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="utenteTipo" class="form-label">Tipo</label>
+                            <select class="form-select" id="utenteTipo" name="tipo" required>
+                                <option value="admin">Admin</option>
+                                <option value="viewer">Viewer</option>
+                            </select>
+                        </div>
+
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                        <button type="submit" class="btn btn-primary">Salva</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        (function () {
+            const modaleEl = document.getElementById('modaleUtente');
+            const modale = new bootstrap.Modal(modaleEl);
+            const form = document.getElementById('formUtente');
+            const titolo = document.getElementById('modaleUtenteTitolo');
+            const errori = document.getElementById('formUtenteErrori');
+            const passwordHint = document.getElementById('passwordHint');
+
+            function getTableInstance() {
+                return window['tabellaUtenti_instance'];
+            }
+
+            function resetForm() {
+                form.reset();
+                document.getElementById('utenteId').value = '';
+                errori.classList.add('d-none');
+                errori.textContent = '';
+            }
+
+            function apriModaleCreazione() {
+                resetForm();
+                titolo.textContent = 'Nuovo utente';
+                document.getElementById('utentePassword').required = true;
+                passwordHint.style.display = 'none';
+                modale.show();
+            }
+
+            async function apriModaleModifica(id) {
+                resetForm();
+                titolo.textContent = 'Modifica utente';
+                document.getElementById('utentePassword').required = false;
+                passwordHint.style.display = 'inline';
+
+                try {
+                    const res = await fetch(`/admin/utenti/${id}`);
+                    if (!res.ok) throw new Error('Impossibile caricare i dati utente');
+                    const utente = await res.json();
+
+                    document.getElementById('utenteId').value = utente.id;
+                    document.getElementById('utenteEmail').value = utente.email;
+                    document.getElementById('utenteTipo').value = utente.type;
+
+                    modale.show();
+                } catch (err) {
+                    alert(err.message);
+                }
+            }
+
+            async function eliminaUtente(id) {
+                try {
+                    const res = await fetch(`/admin/utenti/${id}`, { method: 'DELETE' });
+                    if (!res.ok) {
+                        const body = await res.json().catch(() => ({}));
+                        throw new Error(body.error || 'Errore durante l\'eliminazione');
+                    }
+                    getTableInstance().ajax.reload(null, false);
+                } catch (err) {
+                    alert(err.message);
+                }
+            }
+
+            form.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                errori.classList.add('d-none');
+                errori.textContent = '';
+
+                const id = document.getElementById('utenteId').value;
+                const payload = {
+                    email: document.getElementById('utenteEmail').value.trim(),
+                    type: document.getElementById('utenteTipo').value,
+                };
+                const password = document.getElementById('utentePassword').value;
+                if (password) {
+                    payload.password = password;
+                }
+
+                const isModifica = !!id;
+                const url = isModifica ? `/admin/utenti/${id}` : '/admin/utenti';
+                const method = isModifica ? 'PUT' : 'POST';
+
+                try {
+                    const res = await fetch(url, {
+                        method: method,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const body = await res.json().catch(() => ({}));
+
+                    if (!res.ok) {
+                        throw new Error(body.error || 'Errore durante il salvataggio');
+                    }
+
+                    modale.hide();
+                    getTableInstance().ajax.reload(null, false);
+                } catch (err) {
+                    errori.textContent = err.message;
+                    errori.classList.remove('d-none');
+                }
+            });
+
+            // Eventi emessi dal partial datatable-partial.ejs
+            document.addEventListener('datatable:add', function (e) {
+                if (e.detail.tableId === 'tabellaUtenti') apriModaleCreazione();
+            });
+
+            document.addEventListener('datatable:edit', function (e) {
+                if (e.detail.tableId === 'tabellaUtenti') apriModaleModifica(e.detail.id);
+            });
+
+            document.addEventListener('datatable:delete', function (e) {
+                if (e.detail.tableId === 'tabellaUtenti') eliminaUtente(e.detail.id);
+            });
+        })();
+    </script>

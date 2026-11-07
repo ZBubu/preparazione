@@ -1,0 +1,31 @@
+.popover {
+    --bs-popover-max-width: 280px;
+    --bs-popover-border-radius: 10px;
+    --bs-popover-box-shadow: 0 4px 18px rgba(0, 0, 0, 0.15);
+}
+
+.popover-header {
+    font-weight: 600;
+}
+
+.popover-body {
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.classroom {
+    cursor: pointer;
+}
+.popover {
+    max-width: 350px;
+}
+
+.popover .table {
+    font-size: 0.85rem;
+}
+
+.popover .table th,
+.popover .table td {
+    padding: 4px 6px;
+    vertical-align: top;
+}

@@ -1,0 +1,244 @@
+<% const _tableId=typeof tableId !=='undefined' ? tableId : 'dataTable_' + Math.random().toString(36).slice(2, 8); const
+  _title=typeof title !=='undefined' ? title : null; const _ajaxUrl=typeof ajaxUrl !=='undefined' ? ajaxUrl : '' ; const
+  _columns=typeof columns !=='undefined' ? columns : []; const _showAddButton=typeof showAddButton !=='undefined' ?
+  showAddButton : false; const _addButtonLabel=typeof addButtonLabel !=='undefined' ? addButtonLabel : 'Aggiungi' ;
+  const _addButtonId=typeof addButtonId !=='undefined' ? addButtonId : (_tableId + '_btnAdd' ); const _rowActions=typeof
+  rowActions !=='undefined' ? rowActions : false; const _deleteConfirmMessage=typeof deleteConfirmMessage !=='undefined'
+  ? deleteConfirmMessage : 'Sei sicuro di voler eliminare questo elemento?' ; const _selectable=typeof selectable
+  !=='undefined' ? selectable : false; const _showEdit=typeof showEdit !=='undefined' ? showEdit : true; const
+  _showDelete=typeof showDelete !=='undefined' ? showDelete : true; const _defaultOrder=typeof defaultOrder
+  !=='undefined' ? defaultOrder : [[0, 'desc' ]];const _editLabel=typeof editLabel !=='undefined' ? editLabel
+  : 'Modifica' ; const _showView = typeof showView !== 'undefined' ? showView : false;
+  const _viewLabel = typeof viewLabel !== 'undefined' ? viewLabel : 'Mostra';%>
+
+  <div class="datatable-wrapper" data-table-id="<%= _tableId %>">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <% if (_title) { %>
+        <h4 class="mb-0">
+          <%= _title %>
+        </h4>
+        <% } %>
+          <% if (_showAddButton) { %>
+            <button type="button" id="<%= _addButtonId %>" class="btn btn-primary">
+              <%= _addButtonLabel %>
+            </button>
+            <% } %>
+    </div>
+
+    <table id="<%= _tableId %>" class="table table-striped table-bordered w-100">
+      <thead>
+        <tr>
+          <% if (_selectable) { %>
+            <th></th>
+            <% } %>
+              <% _columns.forEach(function(col) { %>
+                <th>
+                  <%= col.title %>
+                </th>
+                <% }); %>
+                  <% if (_rowActions) { %>
+                    <th>Azioni</th>
+                    <% } %>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    (function () {
+      const tableId = <%- JSON.stringify(_tableId) %>;
+      const columnsConfig = <%- JSON.stringify(_columns) %>;
+      const rowActionsEnabled = <%= _rowActions ? 'true' : 'false' %>;
+      const selectable = <%= _selectable ? 'true' : 'false' %>;
+      const deleteConfirmMessage = <%- JSON.stringify(_deleteConfirmMessage) %>;
+      const showEdit = <%= _showEdit ? 'true' : 'false' %>;
+      const showDelete = <%= _showDelete ? 'true' : 'false' %>;
+      const defaultOrder = <%- JSON.stringify(_defaultOrder) %>;
+      const editLabel = <%- JSON.stringify(_editLabel) %>;
+      const showView = <%= _showView ? 'true' : 'false' %>;
+      const viewLabel = <%- JSON.stringify(_viewLabel) %>;
+
+      // Selezione persistente tra le pagine (server-side)
+      const selected = new Set();
+
+      function esc(s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      }
+
+      const renderers = {
+        tags: function (data) {
+          if (!Array.isArray(data) || !data.length) return '<span class="text-muted">—</span>';
+          return data.map(function (t) {
+            return '<span class="badge bg-secondary me-1">' + esc(t.name) + '</span>';
+          }).join('');
+        },
+        progressivo: function (data, type, row, meta) {
+          return meta.settings._iDisplayStart + meta.row + 1;
+        },
+        stato: function (data) {
+          return data
+            ? '<span class="badge bg-success">Attiva</span>'
+            : '<span class="badge bg-danger">Disattivata</span>';
+        },
+        tentativo: function (data, type, row) {
+          if (row.state === 'in_corso') {
+            return '<a class="btn btn-sm btn-warning" href="/studente/tentativo/' +
+                  encodeURIComponent(row.attempt_id) + '/domanda/1">Riprendi</a>';
+          }
+          if (row.state === 'finito') {
+            return '<a class="btn btn-sm btn-success" href="/studente/tentativo/' +
+                  encodeURIComponent(row.attempt_id) + '/correzione">Mostra correzione</a>';
+          }
+          return '<a class="btn btn-sm btn-primary" href="/studente/verifica/' +
+                encodeURIComponent(row.id) + '/avvia">Avvia tentativo</a>';
+        },
+        correzione: function (data, type, row) {
+          return '<a class="btn btn-sm btn-outline-primary" href="/docente/verifica/' +
+                encodeURIComponent(row.id) + '/tentativi">Mostra tentativi</a>';
+        }
+      };
+
+      const dtColumns = columnsConfig.map(function (col) {
+        const def = { data: col.data, title: col.title };
+        if (col.type && renderers[col.type]) {
+          def.render = renderers[col.type];
+          def.orderable = false;
+          def.searchable = false;
+        } else {
+          def.render = $.fn.dataTable.render.text(); // escape di default
+        }
+        if (col.orderable === false) def.orderable = false;
+        return def;
+      });
+
+      if (selectable) {
+        dtColumns.unshift({
+          data: null,
+          title: '<input type="checkbox" class="form-check-input select-all">',
+          orderable: false,
+          searchable: false,
+          className: 'text-center',
+          render: function (data, type, row) {
+            return '<input type="checkbox" class="form-check-input row-select" data-id="' + esc(row.id) +
+              '"' + (selected.has(row.id) ? ' checked' : '') + '>';
+          }
+        });
+      }
+
+      if (rowActionsEnabled) {
+        dtColumns.push({
+          data: null,
+          title: 'Azioni',
+          orderable: false,
+          searchable: false,
+          render: function (data, type, row) {
+            return (showView
+      ? '<button type="button" class="btn btn-sm btn-outline-primary btn-view-row" data-id="' + esc(row.id) + '">' + esc(viewLabel) + '</button> '
+      : '') +
+    (showEdit
+      ? '<button type="button" class="btn btn-sm btn-outline-secondary btn-edit-row" data-id="' + esc(row.id) + '">' + esc(editLabel) + '</button> '
+      : '') +
+    (showDelete
+      ? '<button type="button" class="btn btn-sm btn-outline-danger btn-delete-row" data-id="' + esc(row.id) + '">Elimina</button>'
+      : '');
+          }
+        });
+      }
+
+      const $table = $('#' + tableId);
+
+      const table = $table.DataTable({
+        serverSide: true,
+        processing: true,
+        ajax: { url: <%- JSON.stringify(_ajaxUrl) %>, type: 'GET' },
+        columns: dtColumns,
+        order: selectable ? defaultOrder.map(function (o) { return [o[0] + 1, o[1]]; }) : defaultOrder,
+        language: { url: 'https://cdn.datatables.net/plug-ins/1.13.6/i18n/it-IT.json' },
+        createdRow: function (row, data) {
+          if (selectable && selected.has(data.id)) $(row).addClass('table-active');
+        },
+        drawCallback: function () {
+          if (selectable) syncSelectAll();
+        }
+      });
+
+      window[tableId + '_instance'] = table;
+
+      function notifySelection() {
+        document.dispatchEvent(new CustomEvent('datatable:selection', {
+          detail: { tableId: tableId, ids: Array.from(selected) }
+        }));
+      }
+
+      function syncSelectAll() {
+        const $boxes = $table.find('tbody .row-select');
+        const allChecked = $boxes.length > 0 && $boxes.filter(':checked').length === $boxes.length;
+        $(table.table().header()).find('.select-all').prop('checked', allChecked);
+      }
+
+      if (selectable) {
+        // API per le pagine che includono il partial
+        window[tableId + '_selection'] = {
+          getIds: function () { return Array.from(selected); },
+          clear: function () {
+            selected.clear();
+            $table.find('.row-select').prop('checked', false);
+            $table.find('tbody tr').removeClass('table-active');
+            syncSelectAll();
+            notifySelection();
+          }
+        };
+
+        $table.on('change', '.row-select', function () {
+          const id = $(this).data('id');
+          if (this.checked) selected.add(id); else selected.delete(id);
+          $(this).closest('tr').toggleClass('table-active', this.checked);
+          syncSelectAll();
+          notifySelection();
+        });
+
+        // "Seleziona tutto" agisce sulle righe della pagina corrente
+        $(table.table().header()).on('change', '.select-all', function () {
+          const checked = this.checked;
+          $table.find('tbody .row-select').each(function () {
+            const id = $(this).data('id');
+            this.checked = checked;
+            if (checked) selected.add(id); else selected.delete(id);
+            $(this).closest('tr').toggleClass('table-active', checked);
+          });
+          notifySelection();
+        });
+      }
+
+      if (rowActionsEnabled) {
+        $table.on('click', '.btn-edit-row', function () {
+          document.dispatchEvent(new CustomEvent('datatable:edit', {
+            detail: { tableId: tableId, id: $(this).data('id') }
+          }));
+        });
+        $table.on('click', '.btn-delete-row', function () {
+          const id = $(this).data('id');
+          if (confirm(deleteConfirmMessage)) {
+            document.dispatchEvent(new CustomEvent('datatable:delete', {
+              detail: { tableId: tableId, id: id }
+            }));
+          }
+        });
+        $table.on('click', '.btn-view-row', function () {
+  document.dispatchEvent(new CustomEvent('datatable:view', {
+    detail: { tableId: tableId, id: $(this).data('id') }
+  }));
+});
+      }
+
+      const addBtn = document.getElementById(<%- JSON.stringify(_addButtonId) %>);
+      if (addBtn) {
+        addBtn.addEventListener('click', function () {
+          document.dispatchEvent(new CustomEvent('datatable:add', { detail: { tableId: tableId } }));
+        });
+      }
+    })();
+  </script>
